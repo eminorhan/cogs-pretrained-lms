@@ -18,9 +18,9 @@ python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_seq2seq.py \
     --do_eval \
     --task translation_en_to_mentalese \
     --source_prefix "translate English to Mentalese: " \
-    --train_file /data/train.json \
-    --validation_file /data/gen.json \
-    --output_dir /tmp \
+    --train_file data/train.json \
+    --validation_file data/gen.json \
+    --output_dir tmp \
     --per_device_train_batch_size=4 \
     --per_device_eval_batch_size=4 \
     --overwrite_output_dir \
