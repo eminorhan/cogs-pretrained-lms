@@ -1,0 +1,7 @@
+# File extensions
+
+
+# Directories
+/__pycache__
+/datasets
+/tmp
