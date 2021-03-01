@@ -2,7 +2,7 @@
 
 First, install huggingface [transformers](https://huggingface.co/transformers/installation.html#installing-from-source) and [datasets](https://huggingface.co/docs/datasets/installation.html#installing-from-source) libraries from source. 
 
-I've preprocessed and saved all the COGS dataset splits in the [data](https://github.com/eminorhan/cogs-pretrained-lms/data) directory. To fine-tune a small pretrained T5 model on the COGS training set and evaluate on the gen set, run: 
+I've preprocessed and saved all the COGS dataset splits in `json` files in the [data](https://github.com/eminorhan/cogs-pretrained-lms/tree/master/data) directory. To fine-tune a small pretrained T5 model on the COGS training set and then evaluate on the generalization set, run: 
 
 ```
 python run_seq2seq.py \
@@ -21,4 +21,3 @@ python run_seq2seq.py \
     --max_train_samples 24000 \
     --max_val_samples 21000
 ```
-
