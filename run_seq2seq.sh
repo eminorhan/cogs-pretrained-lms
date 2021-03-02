@@ -25,7 +25,6 @@ python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_seq2seq.py \
     --per_device_eval_batch_size=4 \
     --overwrite_output_dir \
     --predict_with_generate \
-    --max_train_samples 24000 \
-    --max_val_samples 21000
+    --num_train_epochs 15
 
 echo "Done"
