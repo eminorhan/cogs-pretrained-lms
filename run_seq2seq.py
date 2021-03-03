@@ -535,8 +535,25 @@ def main():
 
         return preds, labels
 
+    def exact_sequence_match(predictions: np.ndarray, labels: np.ndarray) -> np.ndarray:
+        """Calculates the exact match accuracy for each sequence in the batch, between 0 and 1."""
+        batch_size_preds, max_length_preds = predictions.shape
+        batch_size_labels, max_length_labels = labels.shape
+        assert batch_size_labels == batch_size_preds, "mismatch in batch size in predictions and labels in"\
+                                                      " exact_sequence_match()"
+        assert len(predictions.shape) == 2, "exact sequence match only implemented for 2d predictions [bsz, seq_len]."
+        max_length = max(max_length_preds, max_length_labels)
+        predictions = np.pad(predictions, ((0, 0), (0, max_length - max_length_preds)))
+        input_mask = (labels != np.zeros_like(labels)).astype(np.int32)
+        labels = np.pad(labels, ((0, 0), (0, max_length - max_length_labels)))
+        correct_predictions = ((predictions == labels) * input_mask).sum(axis=1)
+        length_per_example = input_mask.sum(axis=1)
+        accuracy_per_sequence = correct_predictions / length_per_example
+        return accuracy_per_sequence
+
     def compute_metrics(eval_preds):
         preds, labels = eval_preds
+        accuracy_per_sequence = exact_sequence_match(preds, labels)
         if isinstance(preds, tuple):
             preds = preds[0]
         decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
@@ -558,6 +575,7 @@ def main():
 
         prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
         result["gen_len"] = np.mean(prediction_lens)
+        result["mean_exact_seq_match"] = np.mean(accuracy_per_sequence)
         result = {k: round(v, 4) for k, v in result.items()}
         return result
 
