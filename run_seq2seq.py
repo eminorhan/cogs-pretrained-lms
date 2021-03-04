@@ -535,7 +535,8 @@ def main():
 
         return preds, labels
 
-    def exact_sequence_match(predictions: np.ndarray, labels: np.ndarray) -> np.ndarray:
+    def exact_sequence_match(predictions: np.ndarray, labels: np.ndarray,
+                             pad_token_id: int) -> np.ndarray:
         """Calculates the exact match accuracy for each sequence in the batch, between 0 and 1."""
         batch_size_preds, max_length_preds = predictions.shape
         batch_size_labels, max_length_labels = labels.shape
@@ -544,7 +545,7 @@ def main():
         assert len(predictions.shape) == 2, "exact sequence match only implemented for 2d predictions [bsz, seq_len]."
         max_length = max(max_length_preds, max_length_labels)
         predictions = np.pad(predictions, ((0, 0), (0, max_length - max_length_preds)))
-        input_mask = (labels != np.zeros_like(labels)).astype(np.int32)
+        input_mask = (labels != np.zeros_like(labels) + pad_token_id).astype(np.int32)
         labels = np.pad(labels, ((0, 0), (0, max_length - max_length_labels)))
         correct_predictions = ((predictions == labels) * input_mask).sum(axis=1)
         length_per_example = input_mask.sum(axis=1)
@@ -553,13 +554,14 @@ def main():
 
     def compute_metrics(eval_preds):
         preds, labels = eval_preds
-        accuracy_per_sequence = exact_sequence_match(preds, labels)
         if isinstance(preds, tuple):
             preds = preds[0]
         decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
         if data_args.ignore_pad_token_for_loss:
             # Replace -100 in the labels as we can't decode them.
             labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+        accuracy_per_sequence = exact_sequence_match(preds, labels,
+                                                     pad_token_id=tokenizer.pad_token_id)
         decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
         # Some simple post-processing
