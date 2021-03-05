@@ -22,7 +22,6 @@ python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_seq2seq.py \
     --output_dir tmp2 \  # results will be saved here
     --per_device_eval_batch_size=1 \
     --predict_with_generate \
-    --max_target_length 2000 \
-    --max_test_samples 8
+    --max_target_length 2000
 
 echo "Done"

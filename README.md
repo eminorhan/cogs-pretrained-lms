@@ -21,3 +21,19 @@ python run_seq2seq.py \
     --save_steps 10000 \
     --num_train_epochs 10
 ```
+
+For evaluating a saved checkpoint on a dataset, run e.g.:
+
+```
+python run_seq2seq.py \
+    --model_name_or_path *PATH_TO_SAVED_CHKPT* \  
+    --do_predict \
+    --task translation_en_to_mentalese \
+    --source_prefix "translate English to Mentalese: " \
+    --validation_file data/gen.json \
+    --test_file data/gen.json \
+    --output_dir *OUTPUT_PATH* \  # results will be saved here
+    --per_device_eval_batch_size=1 \
+    --predict_with_generate \
+    --max_target_length 2000
+```
