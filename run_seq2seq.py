@@ -335,6 +335,7 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
+    config.max_length = data_args.max_target_length
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
         cache_dir=model_args.cache_dir,
@@ -554,6 +555,7 @@ def main():
 
     def compute_metrics(eval_preds):
         preds, labels = eval_preds
+        preds = preds[:, 1:]
         if isinstance(preds, tuple):
             preds = preds[0]
         decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
@@ -563,6 +565,7 @@ def main():
         accuracy_per_sequence = sequence_accuracy(preds, labels,
                                                   pad_token_id=tokenizer.pad_token_id)
         decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+        exact_match_percentage = (accuracy_per_sequence == 1.).sum() / len(accuracy_per_sequence)
 
         # Some simple post-processing
         decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
@@ -578,6 +581,7 @@ def main():
         prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
         result["gen_len"] = np.mean(prediction_lens)
         result["mean_sequence_accuracy"] = np.mean(accuracy_per_sequence)
+        result["exact_match_percentage"] = exact_match_percentage
         result = {k: round(v, 4) for k, v in result.items()}
         return result
 
