@@ -558,13 +558,15 @@ def main():
         preds = preds[:, 1:]
         if isinstance(preds, tuple):
             preds = preds[0]
-        decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
+        decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True,
+                                               clean_up_tokenization_spaces=False)
         if data_args.ignore_pad_token_for_loss:
             # Replace -100 in the labels as we can't decode them.
             labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
         accuracy_per_sequence = sequence_accuracy(preds, labels,
                                                   pad_token_id=tokenizer.pad_token_id)
-        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True,
+                                                clean_up_tokenization_spaces=False)
         exact_match_percentage = (accuracy_per_sequence == 1.).sum() / len(accuracy_per_sequence)
 
         # Some simple post-processing
