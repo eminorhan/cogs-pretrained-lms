@@ -19,7 +19,7 @@ python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_seq2seq.py \
     --validation_file data/gen.json \
     --test_file data/gen.json \
     --output_dir tmp_eval \
-    --per_device_eval_batch_size=1 \
+    --per_device_eval_batch_size 1 \
     --do_predict \
     --predict_with_generate \
     --max_target_length 2000
