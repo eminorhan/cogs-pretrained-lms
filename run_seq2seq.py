@@ -63,6 +63,9 @@ class ModelArguments:
     model_name_or_path: str = field(
         metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
     )
+    use_pretrained_weights: Optional[bool] = field(
+        default=True, metadata={"help": "Whether to use the pretrained model weights or random weights"}
+    )
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
     )
@@ -333,7 +336,7 @@ def main():
         model_args.config_name if model_args.config_name else model_args.model_name_or_path,
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
+        use_auth_token=True if model_args.use_auth_token else None
     )
     config.max_length = data_args.max_target_length
     tokenizer = AutoTokenizer.from_pretrained(
@@ -341,16 +344,20 @@ def main():
         cache_dir=model_args.cache_dir,
         use_fast=model_args.use_fast_tokenizer,
         revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
+        use_auth_token=True if model_args.use_auth_token else None
     )
-    model = AutoModelForSeq2SeqLM.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-        cache_dir=model_args.cache_dir,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-    )
+    if model_args.use_pretrained_weights:
+        model = AutoModelForSeq2SeqLM.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None
+        )
+    else:
+        print('Using a model with random weights')
+        model = AutoModelForSeq2SeqLM.from_config(config)
 
     # Set decoder_start_token_id
     if model.config.decoder_start_token_id is None and isinstance(tokenizer, (MBartTokenizer, MBartTokenizerFast)):
@@ -537,7 +544,7 @@ def main():
         return preds, labels
 
     def sequence_accuracy(predictions: np.ndarray, labels: np.ndarray,
-                             pad_token_id: int) -> np.ndarray:
+                          pad_token_id: int) -> np.ndarray:
         """Calculates the sequence accuracy for each sequence in the batch, between 0 and 1."""
         batch_size_preds, max_length_preds = predictions.shape
         batch_size_labels, max_length_labels = labels.shape

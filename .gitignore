@@ -3,5 +3,5 @@
 
 # Directories
 /__pycache__
-/datasets
-/tmp
+/runs
+/tmp*
