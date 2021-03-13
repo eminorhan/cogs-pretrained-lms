@@ -25,6 +25,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Optional
 
+import json
 import nltk  # Here to have a nice missing dependency error message early on
 import numpy as np
 from datasets import load_dataset, load_metric
@@ -570,11 +571,11 @@ def main():
         if data_args.ignore_pad_token_for_loss:
             # Replace -100 in the labels as we can't decode them.
             labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-        accuracy_per_sequence = sequence_accuracy(preds, labels,
-                                                  pad_token_id=tokenizer.pad_token_id)
+        accuracy_per_sequence = sequence_accuracy(preds, labels, pad_token_id=tokenizer.pad_token_id)
         decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True,
                                                 clean_up_tokenization_spaces=False)
-        exact_match_percentage = (accuracy_per_sequence == 1.).sum() / len(accuracy_per_sequence)
+        exact_matches = (accuracy_per_sequence == 1.)                                        
+        exact_match_percentage = exact_matches.sum() / len(accuracy_per_sequence)
 
         # Some simple post-processing
         decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
@@ -656,10 +657,37 @@ def main():
         trainer.log_metrics("test", metrics)
         trainer.save_metrics("test", metrics)
 
+        # compute exact match accuracies by condition
+        test_labels = test_results.label_ids
+        if data_args.ignore_pad_token_for_loss:
+            # Replace -100 in the labels as we can't decode them.
+            test_labels = np.where(test_labels != -100, test_labels, tokenizer.pad_token_id)
+
+        test_predictions = test_results.predictions[:, 1:]
+        if isinstance(test_predictions, tuple):
+            test_predictions = test_predictions[0]
+
+        accuracy_per_sequence = sequence_accuracy(test_predictions, test_labels, pad_token_id=tokenizer.pad_token_id)
+        exact_matches = (accuracy_per_sequence == 1.)       
+
+        with open('gen_conditions.txt', 'r') as f:
+            condition_list = json.load(f)
+
+        exact_match_acc_by_condition = {}
+        unique_conditions = list(set(condition_list))
+        for cond in unique_conditions:
+            idx = [i for i, x in enumerate(condition_list) if x == cond]
+            exact_match_acc_by_condition[cond] = exact_matches[idx].sum() / len(idx)
+
+        # save results
+        with open('exact_match_acc_by_condition.json', 'w') as f:
+            json.dump(exact_match_acc_by_condition, f)
+
+        # generate predictions 
         if trainer.is_world_process_zero():
             if training_args.predict_with_generate:
                 test_preds = tokenizer.batch_decode(
-                    test_results.predictions, skip_special_tokens=True, clean_up_tokenization_spaces=True
+                    test_results.predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False
                 )
                 test_preds = [pred.strip() for pred in test_preds]
                 output_test_preds_file = os.path.join(training_args.output_dir, "test_generations.txt")
