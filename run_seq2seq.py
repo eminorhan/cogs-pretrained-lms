@@ -678,9 +678,17 @@ def main():
         for cond in unique_conditions:
             idx = [i for i, x in enumerate(condition_list) if x == cond]
             exact_match_acc_by_condition[cond] = exact_matches[idx].sum() / len(idx)
+      
+        # overall accuracy
+        exact_match_acc_by_condition["overall"] = exact_matches.sum() / len(exact_matches)
 
         # save results
-        with open('exact_match_acc_by_condition.json', 'w') as f:
+        if model_args.use_pretrained_weights:
+            save_filename = 'accuracies_{}_pretrained.json'.fomat(model_args.model_name_or_path)
+        else:
+            save_filename = 'accuracies_{}_scratch.json'.fomat(model_args.model_name_or_path)
+
+        with open(save_filename, 'w') as f:
             json.dump(exact_match_acc_by_condition, f)
 
         # generate predictions 

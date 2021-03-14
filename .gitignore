@@ -1,5 +1,6 @@
 # File extensions
 *.out
+*.lock
 
 # Directories
 /__pycache__
