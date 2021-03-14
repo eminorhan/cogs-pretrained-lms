@@ -7,33 +7,18 @@ I've preprocessed and saved all the [COGS dataset](https://github.com/najoungkim
 ```
 python run_seq2seq.py \
     --model_name_or_path t5-small \
+    --use_pretrained_weights True \
     --do_train \
-    --do_eval \
-    --task translation_en_to_mentalese \
-    --source_prefix "translate English to Mentalese: " \
-    --train_file data/train.json \
-    --validation_file data/gen.json \
-    --output_dir tmp \
-    --per_device_train_batch_size=4 \
-    --per_device_eval_batch_size=4 \
-    --overwrite_output_dir \
-    --predict_with_generate \
-    --save_steps 10000 \
-    --num_train_epochs 10
-```
-
-For evaluating a saved checkpoint on a dataset, run e.g.:
-
-```
-python run_seq2seq.py \
-    --model_name_or_path *PATH_TO_SAVED_CHKPT* \  
     --do_predict \
     --task translation_en_to_mentalese \
     --source_prefix "translate English to Mentalese: " \
-    --validation_file data/gen.json \
+    --train_file data/train.json \
     --test_file data/gen.json \
-    --output_dir *OUTPUT_PATH* \  # results will be saved here
-    --per_device_eval_batch_size=1 \
-    --predict_with_generate \
-    --max_target_length 2000
+    --output_dir tmp_t5_small_scratch \
+    --per_device_train_batch_size 64 \
+    --per_device_eval_batch_size 64 \
+    --overwrite_output_dir \
+    --save_steps 250000 \
+    --max_target_length 2000 \
+    --num_train_epochs 100
 ```

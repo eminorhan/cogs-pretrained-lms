@@ -13,7 +13,7 @@ module purge
 module load cuda-10.1
 
 python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_seq2seq.py \
-    --model_name_or_path t5-small \
+    --model_name_or_path t5-base \
     --use_pretrained_weights False \
     --do_train \
     --do_predict \
@@ -25,7 +25,7 @@ python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_seq2seq.py \
     --per_device_train_batch_size 64 \
     --per_device_eval_batch_size 64 \
     --overwrite_output_dir \
-    --save_steps 25000 \
+    --save_steps 250000 \
     --max_target_length 2000 \
     --num_train_epochs 100
 
