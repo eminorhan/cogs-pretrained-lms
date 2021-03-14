@@ -21,7 +21,7 @@ python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_seq2seq.py \
     --source_prefix "translate English to Mentalese: " \
     --train_file data/train.json \
     --test_file data/gen.json \
-    --output_dir tmp_t5_small_scratch \
+    --output_dir tmp_t5_small \
     --per_device_train_batch_size 64 \
     --per_device_eval_batch_size 64 \
     --overwrite_output_dir \
