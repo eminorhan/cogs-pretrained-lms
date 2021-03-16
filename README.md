@@ -23,3 +23,12 @@ python run_seq2seq.py \
     --num_train_epochs 100 \
     --predict_with_generate
 ```
+
+## Results
+Detailed results are in the [`results`](https://github.com/eminorhan/cogs-pretrained-lms/tree/master/results) folder.
+
+| model | generalization accuracy | training loss | epochs | batch size | 
+| ----- |:-----------------------:|:-------------:|:------:|:----------:|
+| `t5_small_scratch` | 0.48       | 0.0001        | 100    | 72         |
+| `t5_base_scratch`  | 0.27       | 0.0003        | 50     | 72         |
+| `t5_large_scratch` | ---        | ---           | ---    | ---        |
