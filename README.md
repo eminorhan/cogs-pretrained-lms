@@ -29,6 +29,9 @@ Detailed results are in the [`results`](https://github.com/eminorhan/cogs-pretra
 
 | model | generalization accuracy | training loss | epochs | batch size | 
 | ----- |:-----------------------:|:-------------:|:------:|:----------:|
-| `t5_small_scratch` | 0.48       | 0.0001        | 100    | 72         |
-| `t5_base_scratch`  | 0.27       | 0.0003        | 50     | 72         |
-| `t5_large_scratch` | ---        | ---           | ---    | ---        |
+| `t5_small_scratch`    | 0.48       | 0.0001        | 100    | 72      |
+| `t5_base_scratch`     | 0.27       | 0.0003        | 50     | 72      |
+| `t5_large_scratch`    | 0.14       | 0.0012        | 24     | 48      |
+| `t5_small_pretrained` | 0.72       | 0.0013        | 50     | 72      |
+| `t5_base_pretrained`  | 0.83       | 0.0005        | 25     | 72      |
+| `t5_large_pretrained` | 0.83       | 0.0006        | 10     | 48      |
