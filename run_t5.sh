@@ -2,8 +2,8 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks=4
-#SBATCH --gres=gpu:v100:1
-#SBATCH --mem=250GB
+#SBATCH --gres=gpu:titanrtx:1
+#SBATCH --mem=180GB
 #SBATCH --time=48:00:00
 #SBATCH --array=0
 #SBATCH --job-name=t5_cogs
@@ -23,7 +23,7 @@ python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_translation.p
     --source_prefix "translate English to English: " \
     --train_file data/train.json \
     --test_file data/gen.json \
-    --output_dir tmp_t5_small \
+    --output_dir tmp_t5_small_pre \
     --per_device_train_batch_size 72 \
     --per_device_eval_batch_size 72 \
     --overwrite_output_dir \
