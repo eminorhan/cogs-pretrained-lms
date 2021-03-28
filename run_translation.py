@@ -61,6 +61,9 @@ class ModelArguments:
     model_name_or_path: str = field(
         metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
     )
+    use_pretrained_weights: Optional[bool] = field(
+        default=True, metadata={"help": "Whether to use the pretrained model weights or random weights"}
+    )
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
     )
@@ -317,14 +320,18 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    model = AutoModelForSeq2SeqLM.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-        cache_dir=model_args.cache_dir,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-    )
+    if model_args.use_pretrained_weights:
+        model = AutoModelForSeq2SeqLM.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None
+        )
+    else:
+        print('Using a model with random weights')
+        model = AutoModelForSeq2SeqLM.from_config(config)
 
     # Set decoder_start_token_id
     if model.config.decoder_start_token_id is None and isinstance(tokenizer, (MBartTokenizer,
@@ -569,10 +576,45 @@ def main():
         trainer.log_metrics("test", metrics)
         trainer.save_metrics("test", metrics)
 
+        # compute exact match accuracies by condition
+        test_labels = test_results.label_ids
+        if data_args.ignore_pad_token_for_loss:
+            # Replace -100 in the labels as we can't decode them.
+            test_labels = np.where(test_labels != -100, test_labels, tokenizer.pad_token_id)
+
+        test_predictions = test_results.predictions[:, 1:]
+        if isinstance(test_predictions, tuple):
+            test_predictions = test_predictions[0]
+
+        accuracy_per_sequence = sequence_accuracy(test_predictions, test_labels, pad_token_id=tokenizer.pad_token_id)
+        exact_matches = (accuracy_per_sequence == 1.)       
+
+        with open('gen_conditions.txt', 'r') as f:
+            condition_list = json.load(f)
+
+        exact_match_acc_by_condition = {}
+        unique_conditions = list(set(condition_list))
+        for cond in unique_conditions:
+            idx = [i for i, x in enumerate(condition_list) if x == cond]
+            exact_match_acc_by_condition[cond] = exact_matches[idx].sum() / len(idx)
+      
+        # overall accuracy
+        exact_match_acc_by_condition["overall"] = exact_matches.sum() / len(exact_matches)
+
+        # save results
+        if model_args.use_pretrained_weights:
+            save_filename = 'accuracies_{}_pretrained.json'.fomat(model_args.model_name_or_path)
+        else:
+            save_filename = 'accuracies_{}_scratch.json'.format(model_args.model_name_or_path)
+
+        with open(save_filename, 'w') as f:
+            json.dump(exact_match_acc_by_condition, f)
+
+        # generate predictions 
         if trainer.is_world_process_zero():
             if training_args.predict_with_generate:
                 test_preds = tokenizer.batch_decode(
-                    test_results.predictions, skip_special_tokens=True, clean_up_tokenization_spaces=True
+                    test_results.predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False
                 )
                 test_preds = [pred.strip() for pred in test_preds]
                 output_test_preds_file = os.path.join(training_args.output_dir, "test_generations.txt")

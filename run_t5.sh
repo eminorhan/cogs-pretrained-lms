@@ -12,13 +12,15 @@
 module purge
 module load cuda-10.1
 
-python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_seq2seq.py \
+python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_translation.py \
     --model_name_or_path t5-small \
-    --use_pretrained_weights False \
+    --use_pretrained_weights True \
     --do_train \
     --do_predict \
-    --task translation_en_to_mentalese \
-    --source_prefix "translate English to Mentalese: " \
+    --source_lang en \
+    --target_lang en \
+    --finetune_target_lang mentalese \
+    --source_prefix "translate English to English: " \
     --train_file data/train.json \
     --test_file data/gen.json \
     --output_dir tmp_t5_small \
