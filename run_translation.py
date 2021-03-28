@@ -36,6 +36,8 @@ from transformers import (
     HfArgumentParser,
     MBartTokenizer,
     MBartTokenizerFast,
+    MBart50Tokenizer,
+    MBart50TokenizerFast,
     M2M100Tokenizer,
     Seq2SeqTrainer,
     Seq2SeqTrainingArguments,
@@ -336,6 +338,8 @@ def main():
     # Set decoder_start_token_id
     if model.config.decoder_start_token_id is None and isinstance(tokenizer, (MBartTokenizer,
                                                                               MBartTokenizerFast,
+                                                                              MBart50Tokenizer,
+                                                                              MBart50TokenizerFast,
                                                                               M2M100Tokenizer)):
         assert (
             data_args.target_lang is not None and data_args.source_lang is not None
@@ -364,7 +368,7 @@ def main():
 
     # For translation we set the codes of our source and target languages (only useful for mBART, the others will
     # ignore those attributes).
-    if isinstance(tokenizer, (MBartTokenizer, MBartTokenizerFast, M2M100Tokenizer)):
+    if isinstance(tokenizer, (MBartTokenizer, MBartTokenizerFast, MBart50Tokenizer, MBart50TokenizerFast, M2M100Tokenizer)):
         if data_args.source_lang is not None:
             tokenizer.src_lang = data_args.source_lang
         if data_args.target_lang is not None:
@@ -372,7 +376,6 @@ def main():
 
     # Get the language codes for input/target.
     source_lang = data_args.source_lang.split("_")[0]
-    finetune_target_lang = data_args.finetune_target_lang.split("_")[0]
 
     # Temporarily set max_target_length for training.
     max_target_length = data_args.max_target_length
@@ -386,7 +389,7 @@ def main():
 
     def preprocess_function(examples):
         inputs = [ex[source_lang] for ex in examples["translation"]]
-        targets = [ex[finetune_target_lang] for ex in examples["translation"]]
+        targets = [ex[data_args.finetune_target_lang] for ex in examples["translation"]]
         inputs = [prefix + inp for inp in inputs]
         model_inputs = tokenizer(inputs, max_length=data_args.max_source_length, padding=padding, truncation=True)
 
