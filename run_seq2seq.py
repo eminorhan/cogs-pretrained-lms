@@ -199,6 +199,7 @@ class DataTrainingArguments:
     )
     source_lang: Optional[str] = field(default=None, metadata={"help": "Source language id for translation."})
     target_lang: Optional[str] = field(default=None, metadata={"help": "Target language id for translation."})
+    finetune_target_lang: Optional[str] = field(default=None, metadata={"help": "Target language id for translation."})
     num_beams: Optional[int] = field(
         default=None,
         metadata={
@@ -447,10 +448,14 @@ def main():
             f"`{model.__class__.__name__}`. This will lead to loss being calculated twice and will take up more memory"
         )
 
+    total_num_unk_target = 0
+    total_not_unk_target = 0
+    total_num_unk_source = 0
+    total_not_unk_source = 0
     def preprocess_function(examples):
         if data_args.task.startswith("translation"):
             inputs = [ex[source_lang] for ex in examples["translation"]]
-            targets = [ex[target_lang] for ex in examples["translation"]]
+            targets = [ex["mentalese"] for ex in examples["translation"]]  # TODO: change
         else:
             inputs = examples[text_column]
             targets = examples[summary_column]
