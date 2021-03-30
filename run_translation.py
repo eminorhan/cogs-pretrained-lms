@@ -607,7 +607,7 @@ def main():
 
         # save results
         if model_args.use_pretrained_weights:
-            save_filename = 'accuracies_{}_pretrained.json'.fomat(model_args.model_name_or_path)
+            save_filename = 'accuracies_{}_pretrained.json'.format(model_args.model_name_or_path)
         else:
             save_filename = 'accuracies_{}_scratch.json'.format(model_args.model_name_or_path)
 

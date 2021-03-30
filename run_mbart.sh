@@ -2,12 +2,12 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks=4
-#SBATCH --gres=gpu:v100:1
+#SBATCH --gres=gpu:titanrtx:1
 #SBATCH --mem=180GB
 #SBATCH --time=48:00:00
 #SBATCH --array=0
-#SBATCH --job-name=t5_cogs
-#SBATCH --output=t5_cogs_%A_%a.out
+#SBATCH --job-name=mbart50_cogs
+#SBATCH --output=mbart50_cogs_%A_%a.out
 
 module purge
 module load cuda-10.1
@@ -23,8 +23,8 @@ python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_translation.p
     --train_file data/train.json \
     --test_file data/gen.json \
     --output_dir tmp_mbart_large_50_pre \
-    --per_device_train_batch_size 16 \
-    --per_device_eval_batch_size 16 \
+    --per_device_train_batch_size 12 \
+    --per_device_eval_batch_size 12 \
     --overwrite_output_dir \
     --save_steps 250000 \
     --max_target_length 2000 \

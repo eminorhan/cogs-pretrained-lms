@@ -5,16 +5,18 @@ First, install huggingface [transformers](https://huggingface.co/transformers/in
 I've preprocessed and saved all the [COGS dataset](https://github.com/najoungkim/COGS) splits in `json` files inside the [data](https://github.com/eminorhan/cogs-pretrained-lms/tree/master/data) directory. To fine-tune a small pretrained T5 model on the COGS training set and then evaluate on the generalization set, run e.g.: 
 
 ```
-python run_seq2seq.py \
+python -u run_translation.py \
     --model_name_or_path t5-small \
     --use_pretrained_weights True \
     --do_train \
     --do_predict \
-    --task translation_en_to_mentalese \
-    --source_prefix "translate English to Mentalese: " \
+    --source_lang en \
+    --target_lang en \
+    --finetune_target_lang mentalese \
+    --source_prefix "translate English to English: " \
     --train_file data/train.json \
     --test_file data/gen.json \
-    --output_dir tmp_t5_small \
+    --output_dir tmp_t5_small_pre \
     --per_device_train_batch_size 64 \
     --per_device_eval_batch_size 64 \
     --overwrite_output_dir \
