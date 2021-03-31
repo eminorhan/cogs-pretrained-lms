@@ -36,6 +36,8 @@ from transformers import (
     HfArgumentParser,
     MBartTokenizer,
     MBartTokenizerFast,
+    MBart50Tokenizer,
+    MBart50TokenizerFast,
     M2M100Tokenizer,
     Seq2SeqTrainer,
     Seq2SeqTrainingArguments,
@@ -60,6 +62,9 @@ class ModelArguments:
 
     model_name_or_path: str = field(
         metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
+    )
+    use_pretrained_weights: Optional[bool] = field(
+        default=True, metadata={"help": "Whether to use the pretrained model weights or random weights"}
     )
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
@@ -317,18 +322,24 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    model = AutoModelForSeq2SeqLM.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-        cache_dir=model_args.cache_dir,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-    )
+    if model_args.use_pretrained_weights:
+        model = AutoModelForSeq2SeqLM.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None
+        )
+    else:
+        print('Using a model with random weights')
+        model = AutoModelForSeq2SeqLM.from_config(config)
 
     # Set decoder_start_token_id
     if model.config.decoder_start_token_id is None and isinstance(tokenizer, (MBartTokenizer,
                                                                               MBartTokenizerFast,
+                                                                              MBart50Tokenizer,
+                                                                              MBart50TokenizerFast,
                                                                               M2M100Tokenizer)):
         assert (
             data_args.target_lang is not None and data_args.source_lang is not None
@@ -357,7 +368,7 @@ def main():
 
     # For translation we set the codes of our source and target languages (only useful for mBART, the others will
     # ignore those attributes).
-    if isinstance(tokenizer, (MBartTokenizer, MBartTokenizerFast, M2M100Tokenizer)):
+    if isinstance(tokenizer, (MBartTokenizer, MBartTokenizerFast, MBart50Tokenizer, MBart50TokenizerFast, M2M100Tokenizer)):
         if data_args.source_lang is not None:
             tokenizer.src_lang = data_args.source_lang
         if data_args.target_lang is not None:
@@ -365,7 +376,6 @@ def main():
 
     # Get the language codes for input/target.
     source_lang = data_args.source_lang.split("_")[0]
-    finetune_target_lang = data_args.finetune_target_lang.split("_")[0]
 
     # Temporarily set max_target_length for training.
     max_target_length = data_args.max_target_length
@@ -379,7 +389,7 @@ def main():
 
     def preprocess_function(examples):
         inputs = [ex[source_lang] for ex in examples["translation"]]
-        targets = [ex[finetune_target_lang] for ex in examples["translation"]]
+        targets = [ex[data_args.finetune_target_lang] for ex in examples["translation"]]
         inputs = [prefix + inp for inp in inputs]
         model_inputs = tokenizer(inputs, max_length=data_args.max_source_length, padding=padding, truncation=True)
 
@@ -569,6 +579,41 @@ def main():
         trainer.log_metrics("test", metrics)
         trainer.save_metrics("test", metrics)
 
+        # compute exact match accuracies by condition
+        test_labels = test_results.label_ids
+        if data_args.ignore_pad_token_for_loss:
+            # Replace -100 in the labels as we can't decode them.
+            test_labels = np.where(test_labels != -100, test_labels, tokenizer.pad_token_id)
+
+        test_predictions = test_results.predictions[:, 1:]
+        if isinstance(test_predictions, tuple):
+            test_predictions = test_predictions[0]
+
+        accuracy_per_sequence = sequence_accuracy(test_predictions, test_labels, pad_token_id=tokenizer.pad_token_id)
+        exact_matches = (accuracy_per_sequence == 1.)       
+
+        with open('gen_conditions.txt', 'r') as f:
+            condition_list = json.load(f)
+
+        exact_match_acc_by_condition = {}
+        unique_conditions = list(set(condition_list))
+        for cond in unique_conditions:
+            idx = [i for i, x in enumerate(condition_list) if x == cond]
+            exact_match_acc_by_condition[cond] = exact_matches[idx].sum() / len(idx)
+      
+        # overall accuracy
+        exact_match_acc_by_condition["overall"] = exact_matches.sum() / len(exact_matches)
+
+        # save results
+        if model_args.use_pretrained_weights:
+            save_filename = 'accuracies_{}_pretrained.json'.fomat(model_args.model_name_or_path)
+        else:
+            save_filename = 'accuracies_{}_scratch.json'.format(model_args.model_name_or_path)
+
+        with open(save_filename, 'w') as f:
+            json.dump(exact_match_acc_by_condition, f)
+
+        # generate predictions 
         if trainer.is_world_process_zero():
             if training_args.predict_with_generate:
                 test_preds = tokenizer.batch_decode(
