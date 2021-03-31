@@ -6,11 +6,11 @@
 #SBATCH --mem=180GB
 #SBATCH --time=48:00:00
 #SBATCH --array=0
-#SBATCH --job-name=t5_cogs
-#SBATCH --output=t5_cogs_%A_%a.out
 
 module purge
 module load cuda-10.1
+module load python3.7
+source pretrain/bin/activate
 
 python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_translation.py \
     --model_name_or_path t5-small \
