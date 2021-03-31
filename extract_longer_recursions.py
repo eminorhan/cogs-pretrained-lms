@@ -77,16 +77,18 @@ def main(flags):
     assert num_total_examples == len(conditions_data), "Mismatch in number of input examples and number of conditions. "\
                                                        " (%d versus %d)" % (num_total_examples, len(conditions_data))
 
-    for i in range(3, 12):
+    max_recursion = max(list(recursions_data.keys()))
+    min_recursion = min(list(recursions_data.keys()))
+    for i in range(min_recursion, max_recursion):
         extra_training_examples = []
         extra_test_examples = []
         test_conditions = normal_test_conditions.copy()
-        recursions_train = [j for j in range(3, i + 1)]
-        recursions_test = [j for j in range(i + 1, 13)]
+        recursions_train = [j for j in range(min_recursion, i + 1)]
+        recursions_test = [j for j in range(i + 1, max_recursion + 1)]
         assert set(recursions_train).isdisjoint(set(recursions_test)), "Overlap in train and test."
         train_file = flags["output_data_file_pattern"].format("train", str(0), str(i))
-        test_file = flags["output_data_file_pattern"].format("test", str(i + 1), 12)
-        conditions_file = flags["output_data_file_pattern"].format("conditions", str(i + 1), 12)
+        test_file = flags["output_data_file_pattern"].format("test", str(i + 1), max_recursion)
+        conditions_file = flags["output_data_file_pattern"].format("conditions", str(i + 1), max_recursion)
         extra_train_conditions = []
         for rec_train in recursions_train:
             extra_training_examples.extend(recursions_data[rec_train]["data"])
