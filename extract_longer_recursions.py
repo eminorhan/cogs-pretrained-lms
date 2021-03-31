@@ -99,11 +99,14 @@ def main(flags):
         assert Counter(extra_train_conditions + test_conditions) == Counter(conditions_data), \
             "A condition got lost."
         total_train_examples = normal_train_data + extra_training_examples
+        train_str = [str(ex) for ex in total_train_examples]
         with open(train_file, "w") as outfile:
             for train_example in total_train_examples:
                 json.dump(train_example, outfile)
                 outfile.write('\n')
         total_test_examples = normal_test_data + extra_test_examples
+        test_str = [str(ex) for ex in total_test_examples]
+        assert set(train_str).isdisjoint(set(test_str)), "Overlap train and gen."
         assert len(total_test_examples) == len(test_conditions), "Incorrect conditions file."
         with open(test_file, "w") as outfile:
             for test_example in total_test_examples:
