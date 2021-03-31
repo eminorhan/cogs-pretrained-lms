@@ -6,25 +6,25 @@
 #SBATCH --mem=180GB
 #SBATCH --time=48:00:00
 #SBATCH --array=0
-#SBATCH --job-name=mbart50_cogs
-#SBATCH --output=mbart50_cogs_%A_%a.out
+#SBATCH --job-name=m2m100_cogs
+#SBATCH --output=m2m100_cogs_%A_%a.out
 
 module purge
 module load cuda-10.1
 
 python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_translation.py \
-    --model_name_or_path facebook/mbart-large-50 \
+    --model_name_or_path facebook/m2m100_418M \
     --use_pretrained_weights True \
     --do_train \
     --do_predict \
-    --source_lang en_XX \
-    --target_lang en_XX \
+    --source_lang en \
+    --target_lang en \
     --finetune_target_lang mentalese \
     --train_file data/train.json \
     --test_file data/gen.json \
-    --output_dir tmp_mbart_large_50_pre \
-    --per_device_train_batch_size 12 \
-    --per_device_eval_batch_size 12 \
+    --output_dir tmp_m2m100_418m_pre \
+    --per_device_train_batch_size 64 \
+    --per_device_eval_batch_size 64 \
     --overwrite_output_dir \
     --save_steps 250000 \
     --max_target_length 2000 \
