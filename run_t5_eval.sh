@@ -16,24 +16,21 @@ module load cuda-10.1
 ((MIN_TEST_DEPTH=MAX_TRAIN_DEPTH+1))
 
 python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_translation.py \
-    --model_name_or_path t5-small \
-    --use_pretrained_weights False \
-    --do_train \
+    --model_name_or_path tmp_t5_small_pre_recursion_10 \
+    --use_pretrained_weights True \
     --do_predict \
     --source_lang en \
     --target_lang en \
     --finetune_target_lang mentalese \
     --source_prefix "translate English to English: " \
-    --train_file data/recursion_splits/train_recursion_depth_from_0_to_$MAX_TRAIN_DEPTH.json \
     --test_file data/recursion_splits/test_recursion_depth_from_${MIN_TEST_DEPTH}_to_12.json \
+     --validation_file data/recursion_splits/test_recursion_depth_from_${MIN_TEST_DEPTH}_to_12.json \
     --gen_conditions_file data/recursion_splits/conditions_recursion_depth_from_${MIN_TEST_DEPTH}_to_12.json \
-    --output_dir tmp_t5_small_scratch_recursion_$MAX_TRAIN_DEPTH \
-    --per_device_train_batch_size 32 \
-    --per_device_eval_batch_size 32 \
+    --output_dir tmp_t5_small_pre_recursion_${MAX_TRAIN_DEPTH}_eval \
+    --per_device_eval_batch_size 16 \
     --overwrite_output_dir \
     --save_steps 250000 \
-    --max_target_length 2000 \
-    --num_train_epochs 100 \
+    --max_target_length 1024 \
     --predict_with_generate
 
 echo "Done"

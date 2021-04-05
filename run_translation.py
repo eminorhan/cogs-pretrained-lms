@@ -67,6 +67,9 @@ class ModelArguments:
     use_pretrained_weights: Optional[bool] = field(
         default=True, metadata={"help": "Whether to use the pretrained model weights or random weights"}
     )
+    model_parallel: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to use model parallelism (experimental)"}
+    )
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
     )
@@ -110,6 +113,7 @@ class DataTrainingArguments:
     dataset_config_name: Optional[str] = field(
         default=None, metadata={"help": "The configuration name of the dataset to use (via the datasets library)."}
     )
+    gen_conditions_file: Optional[str] = field(default=None, metadata={"help": "Generalization conditions file (a jsonlines)."})
     train_file: Optional[str] = field(default=None, metadata={"help": "The input training data file (a jsonlines)."})
     validation_file: Optional[str] = field(
         default=None,
@@ -272,7 +276,9 @@ def main():
     # Set the verbosity to info of the Transformers logger (on main process only):
     if is_main_process(training_args.local_rank):
         transformers.utils.logging.set_verbosity_info()
-    logger.info("Training/evaluation parameters %s", training_args)
+    logger.info("Training arguments %s", training_args)
+    logger.info("Model arguments %s", model_args)
+    logger.info("Data arguments %s", data_args)
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
@@ -335,6 +341,29 @@ def main():
     else:
         print('Using a model with random weights')
         model = AutoModelForSeq2SeqLM.from_config(config)
+
+    # optinally add model parallelism here
+    if model_args.model_parallel:
+        print('Using model parallel on {:d} GPUs'.format(torch.cuda.device_count()))
+        assert model_args.model_name_or_path in ['t5-11b', 't5-3b', 't5-large'], "Use model parallel only for sufficiently large models."
+        assert torch.cuda.device_count() > 1, "Model parallelism requires more than 1 GPU."
+        if torch.cuda.device_count() == 4:
+            device_map = {
+                0: [0, 1, 2], 
+                1: [3, 4, 5, 6, 7, 8, 9], 
+                2: [10, 11, 12, 13, 14, 15, 16], 
+                3: [17, 18, 19, 20, 21, 22, 23]}
+        elif torch.cuda.device_count() == 3:
+            device_map = {
+                0: [0, 1, 2, 3], 
+                1: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13], 
+                2: [14, 15, 16, 17, 18, 19, 20, 21, 22, 23]}
+        elif torch.cuda.device_count() == 2:
+            device_map = {
+                0: [0, 1, 2, 3, 4, 5, 6, 7], 
+                1: [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]}
+
+        model.parallelize(device_map)
 
     # Set decoder_start_token_id
     if model.config.decoder_start_token_id is None and isinstance(tokenizer, (MBartTokenizer,
@@ -593,7 +622,7 @@ def main():
         accuracy_per_sequence = sequence_accuracy(test_predictions, test_labels, pad_token_id=tokenizer.pad_token_id)
         exact_matches = (accuracy_per_sequence == 1.)       
 
-        with open('gen_conditions.txt', 'r') as f:
+        with open(data_args.gen_conditions_file, 'r') as f:
             condition_list = json.load(f)
 
         exact_match_acc_by_condition = {}
@@ -604,6 +633,8 @@ def main():
       
         # overall accuracy
         exact_match_acc_by_condition["overall"] = exact_matches.sum() / len(exact_matches)
+
+        logger.info("Exact match accuries by condition: %s", exact_match_acc_by_condition)
 
         # save results
         if model_args.use_pretrained_weights:
