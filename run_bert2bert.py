@@ -30,30 +30,19 @@ from datasets import load_dataset, load_metric
 
 import transformers
 from transformers import (
-    AutoConfig,
-    AutoModelForSeq2SeqLM,
-    AutoTokenizer,
     DataCollatorForSeq2Seq,
     HfArgumentParser,
-    MBartTokenizer,
-    MBartTokenizerFast,
-    MBart50Tokenizer,
-    MBart50TokenizerFast,
-    M2M100Tokenizer,
     Seq2SeqTrainer,
     Seq2SeqTrainingArguments,
-    default_data_collator,
     set_seed,
 )
+from transformers import BertTokenizerFast, EncoderDecoderModel
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 from transformers.utils import check_min_version
 
-
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 check_min_version("4.5.0.dev0")
-
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class ModelArguments:
@@ -61,24 +50,14 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
 
-    model_name_or_path: str = field(
-        metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
+    encoder_model: str = field(
+        metadata={"help": "Encoder BERT"}
     )
-    use_pretrained_weights: Optional[bool] = field(
-        default=True, metadata={"help": "Whether to use the pretrained model weights or random weights"}
-    )
-    model_parallel: Optional[bool] = field(
-        default=False, metadata={"help": "Whether to use model parallelism (experimental)"}
-    )
-    config_name: Optional[str] = field(
-        default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
+    decoder_model: str = field(
+        metadata={"help": "Decoder BERT"}
     )
     tokenizer_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
-    )
-    cache_dir: Optional[str] = field(
-        default=None,
-        metadata={"help": "Where to store the pretrained models downloaded from huggingface.co"},
     )
     use_fast_tokenizer: bool = field(
         default=True,
@@ -102,11 +81,6 @@ class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
-
-    source_lang: str = field(default=None, metadata={"help": "Source language id for translation."})
-    target_lang: str = field(default=None, metadata={"help": "Target language id for translation."})
-    finetune_target_lang: str = field(default=None, metadata={"help": "Finetune Target language id for translation."})
-
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )
@@ -200,16 +174,10 @@ class DataTrainingArguments:
             "help": "Whether to ignore the tokens corresponding to padded labels in the loss computation or not."
         },
     )
-    source_prefix: Optional[str] = field(
-        default=None, metadata={"help": "A prefix to add before every source text (useful for T5 models)."}
-    )
 
     def __post_init__(self):
         if self.dataset_name is None and self.train_file is None and self.validation_file is None:
             raise ValueError("Need either a dataset name or a training/validation file.")
-        elif self.source_lang is None or self.target_lang is None:
-            raise ValueError("Need to specify the source language and the target language.")
-
         if self.train_file is not None:
             extension = self.train_file.split(".")[-1]
             assert extension == "json", "`train_file` should be a json file."
@@ -232,18 +200,6 @@ def main():
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
-    if data_args.source_prefix is None and model_args.model_name_or_path in [
-        "t5-small",
-        "t5-base",
-        "t5-large",
-        "t5-3b",
-        "t5-11b",
-    ]:
-        logger.warning(
-            "You're running a t5 model but didn't provide a source prefix, which is expected, e.g. with "
-            "`--source_prefix 'translate English to German: ' `"
-        )
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -311,82 +267,29 @@ def main():
     # https://huggingface.co/docs/datasets/loading_datasets.html.
 
     # Load pretrained model and tokenizer
-    #
-    # Distributed training:
-    # The .from_pretrained methods guarantee that only one local process can concurrently
-    # download model & vocab.
-    config = AutoConfig.from_pretrained(
-        model_args.config_name if model_args.config_name else model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-    )
-    config.max_length = data_args.max_target_length
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
-        use_fast=model_args.use_fast_tokenizer,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-    )
-    if model_args.use_pretrained_weights:
-        model = AutoModelForSeq2SeqLM.from_pretrained(
-            model_args.model_name_or_path,
-            from_tf=bool(".ckpt" in model_args.model_name_or_path),
-            config=config,
-            cache_dir=model_args.cache_dir,
-            revision=model_args.model_revision,
-            use_auth_token=True if model_args.use_auth_token else None
-        )
-    else:
-        print('Using a model with random weights')
-        model = AutoModelForSeq2SeqLM.from_config(config)
+    tokenizer = BertTokenizerFast.from_pretrained(model_args.encoder_model)
+    tokenizer.bos_token = tokenizer.cls_token
+    tokenizer.eos_token = tokenizer.sep_token
 
-    # optinally add model parallelism here
-    if model_args.model_parallel:
-        import torch
-        print('Using model parallel on {:d} GPUs'.format(torch.cuda.device_count()))
-        assert model_args.model_name_or_path in ['t5-11b', 't5-3b', 't5-large'], "Use model parallel only for sufficiently large models."
-        assert torch.cuda.device_count() > 1, "Model parallelism requires more than 1 GPU."
-        if torch.cuda.device_count() == 4:
-            device_map = {
-                0: [0, 1, 2], 
-                1: [3, 4, 5, 6, 7, 8, 9], 
-                2: [10, 11, 12, 13, 14, 15, 16], 
-                3: [17, 18, 19, 20, 21, 22, 23]}
-        elif torch.cuda.device_count() == 3:
-            device_map = {
-                0: [0, 1, 2, 3], 
-                1: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13], 
-                2: [14, 15, 16, 17, 18, 19, 20, 21, 22, 23]}
-        elif torch.cuda.device_count() == 2:
-            device_map = {
-                0: [0, 1, 2, 3, 4, 5, 6, 7], 
-                1: [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]}
+    model = EncoderDecoderModel.from_encoder_decoder_pretrained(model_args.encoder_model, model_args.decoder_model)
+    print(model)
 
-        model.parallelize(device_map)
+    # set special tokens
+    model.config.decoder_start_token_id = tokenizer.bos_token_id
+    model.config.eos_token_id = tokenizer.eos_token_id
+    model.config.pad_token_id = tokenizer.pad_token_id
 
-    # Set decoder_start_token_id
-    if model.config.decoder_start_token_id is None and isinstance(tokenizer, (MBartTokenizer,
-                                                                              MBartTokenizerFast,
-                                                                              MBart50Tokenizer,
-                                                                              MBart50TokenizerFast,
-                                                                              M2M100Tokenizer)):
-        assert (
-            data_args.target_lang is not None and data_args.source_lang is not None
-        ), "mBart requires --target_lang and --source_lang"
-        if isinstance(tokenizer, MBartTokenizer):
-            model.config.decoder_start_token_id = tokenizer.lang_code_to_id[data_args.target_lang]
-        else:
-            model.config.decoder_start_token_id = tokenizer.convert_tokens_to_ids(data_args.target_lang)
+    # sensible parameters for beam search
+    model.config.vocab_size = model.config.decoder.vocab_size
+    model.config.max_length = 512
+    model.config.no_repeat_ngram_size = 3
+    model.config.early_stopping = True
+    model.config.num_beams = 4
 
     if model.config.decoder_start_token_id is None:
         raise ValueError("Make sure that `config.decoder_start_token_id` is correctly defined")
 
-    prefix = data_args.source_prefix if data_args.source_prefix is not None else ""
-
-    # Preprocessing the datasets.
-    # We need to tokenize inputs and targets.
+    # Preprocessing the datasets. We need to tokenize inputs and targets.
     if training_args.do_train:
         column_names = datasets["train"].column_names
     elif training_args.do_eval:
@@ -396,17 +299,6 @@ def main():
     else:
         logger.info("There is nothing to do. Please pass `do_train`, `do_eval` and/or `do_predict`.")
         return
-
-    # For translation we set the codes of our source and target languages (only useful for mBART, the others will
-    # ignore those attributes).
-    if isinstance(tokenizer, (MBartTokenizer, MBartTokenizerFast, MBart50Tokenizer, MBart50TokenizerFast, M2M100Tokenizer)):
-        if data_args.source_lang is not None:
-            tokenizer.src_lang = data_args.source_lang
-        if data_args.target_lang is not None:
-            tokenizer.tgt_lang = data_args.target_lang
-
-    # Get the language codes for input/target.
-    source_lang = data_args.source_lang.split("_")[0]
 
     # Temporarily set max_target_length for training.
     max_target_length = data_args.max_target_length
@@ -418,24 +310,23 @@ def main():
             f"`{model.__class__.__name__}`. This will lead to loss being calculated twice and will take up more memory"
         )
 
-    def preprocess_function(examples):
-        inputs = [ex[source_lang] for ex in examples["translation"]]
-        targets = [ex[data_args.finetune_target_lang] for ex in examples["translation"]]
-        inputs = [prefix + inp for inp in inputs]
-        model_inputs = tokenizer(inputs, max_length=data_args.max_source_length, padding=padding, truncation=True)
+    def preprocess_function(batch):
+        inputs = [ex["en"] for ex in batch["translation"]]
+        outputs = [ex["mentalese"] for ex in batch["translation"]]
+        
+        tokenized_inputs = tokenizer(inputs, max_length=data_args.max_source_length, padding=padding, truncation=True)
+        tokenized_outputs = tokenizer(outputs, max_length=max_target_length, padding=padding, truncation=True)
 
-        # Setup the tokenizer for targets
-        with tokenizer.as_target_tokenizer():
-            labels = tokenizer(targets, max_length=max_target_length, padding=padding, truncation=True)
+        batch["input_ids"] = tokenized_inputs.input_ids
+        batch["attention_mask"] = tokenized_inputs.attention_mask
+        batch["decoder_input_ids"] = tokenized_outputs.input_ids
+        batch["decoder_attention_mask"] = tokenized_outputs.attention_mask
+        batch["labels"] = tokenized_outputs.input_ids.copy()
 
-        # If we are padding here, replace all tokenizer.pad_token_id in the labels by -100 when we want to ignore padding in the loss
-        if padding == "max_length" and data_args.ignore_pad_token_for_loss:
-            labels["input_ids"] = [
-                [(l if l != tokenizer.pad_token_id else -100) for l in label] for label in labels["input_ids"]
-            ]
+        # because BERT automatically shifts the labels, the labels correspond exactly to `decoder_input_ids`. We have to make sure that the PAD token is ignored
+        batch["labels"] = [[-100 if token == tokenizer.pad_token_id else token for token in labels] for labels in batch["labels"]]
 
-        model_inputs["labels"] = labels["input_ids"]
-        return model_inputs
+        return batch
 
     if training_args.do_train:
         train_dataset = datasets["train"]
@@ -482,16 +373,12 @@ def main():
         )
 
     # Data collator
-    label_pad_token_id = -100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
-    if data_args.pad_to_max_length:
-        data_collator = default_data_collator
-    else:
-        data_collator = DataCollatorForSeq2Seq(
-            tokenizer,
-            model=model,
-            label_pad_token_id=label_pad_token_id,
-            pad_to_multiple_of=8 if training_args.fp16 else None,
-        )
+    data_collator = DataCollatorForSeq2Seq(
+        tokenizer,
+        model=model,
+        label_pad_token_id=-100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id,
+        pad_to_multiple_of=8 if training_args.fp16 else None,
+    )
 
     # Metric
     metric = load_metric("sacrebleu")
@@ -558,17 +445,9 @@ def main():
         compute_metrics=compute_metrics if training_args.predict_with_generate else None,
     )
 
-    print(model)
-
     # Training
     if training_args.do_train:
-        if last_checkpoint is not None:
-            checkpoint = last_checkpoint
-        elif os.path.isdir(model_args.model_name_or_path):
-            checkpoint = model_args.model_name_or_path
-        else:
-            checkpoint = None
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        train_result = trainer.train(resume_from_checkpoint=None)
         trainer.save_model()  # Saves the tokenizer too for easy upload
 
         metrics = train_result.metrics
@@ -639,10 +518,7 @@ def main():
         logger.info("Exact match accuries by condition: %s", exact_match_acc_by_condition)
 
         # save results
-        if model_args.use_pretrained_weights:
-            save_filename = 'accuracies_{}_pretrained.json'.format(model_args.model_name_or_path)
-        else:
-            save_filename = 'accuracies_{}_scratch.json'.format(model_args.model_name_or_path)
+        save_filename = 'accuracies_bert2bert_{}_to_{}.json'.format(model_args.encoder_model, model_args.decoder_model)
 
         with open(save_filename, 'w') as f:
             json.dump(exact_match_acc_by_condition, f)
