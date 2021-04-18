@@ -17,8 +17,8 @@ python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_bert2bert.py 
     --decoder_model bert-base-uncased \
     --do_train \
     --do_predict \
-    --train_file data/train.json \
-    --test_file data/gen.json \
+    --train_file data_cogs/train.json \
+    --test_file data_cogs/gen.json \
     --gen_conditions_file gen_conditions.txt \
     --output_dir tmp_bert2bert \
     --per_device_train_batch_size 4 \

@@ -21,8 +21,8 @@ python -u /misc/vlgscratch4/LakeGroup/emin/cogs-pretrained-lms/run_translation.p
     --target_lang en \
     --finetune_target_lang mentalese \
     --source_prefix "translate English to English: " \
-    --train_file data/train.json \
-    --test_file data/gen.json \
+    --train_file data_cogs/train.json \
+    --test_file data_cogs/gen.json \
     --output_dir tmp_t5_small_pre \
     --per_device_train_batch_size 72 \
     --per_device_eval_batch_size 72 \
