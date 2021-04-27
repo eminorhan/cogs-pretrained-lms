@@ -272,7 +272,6 @@ def main():
     tokenizer.eos_token = tokenizer.sep_token
 
     model = EncoderDecoderModel.from_encoder_decoder_pretrained(model_args.encoder_model, model_args.decoder_model)
-    print(model)
 
     # set special tokens
     model.config.decoder_start_token_id = tokenizer.bos_token_id
@@ -282,9 +281,13 @@ def main():
     # sensible parameters for beam search
     model.config.vocab_size = model.config.decoder.vocab_size
     model.config.max_length = 512
-    model.config.no_repeat_ngram_size = 3
-    model.config.early_stopping = True
-    model.config.num_beams = 4
+    model.config.no_repeat_ngram_size = 0
+    model.config.early_stopping = False
+    model.config.num_beams = 1
+    model.config.decoder.is_decoder = True
+    model.config.decoder.add_cross_attention = True
+
+    print(model)
 
     if model.config.decoder_start_token_id is None:
         raise ValueError("Make sure that `config.decoder_start_token_id` is correctly defined")
@@ -496,32 +499,42 @@ def main():
             # Replace -100 in the labels as we can't decode them.
             test_labels = np.where(test_labels != -100, test_labels, tokenizer.pad_token_id)
 
-        test_predictions = test_results.predictions[:, 1:]
+        test_predictions = test_results.predictions
         if isinstance(test_predictions, tuple):
             test_predictions = test_predictions[0]
+
+        print(test_predictions.shape)
+        print(test_labels.shape)
+
+        print(test_predictions)
+        print(test_labels)
 
         accuracy_per_sequence = sequence_accuracy(test_predictions, test_labels, pad_token_id=tokenizer.pad_token_id)
         exact_matches = (accuracy_per_sequence == 1.)       
 
-        with open(data_args.gen_conditions_file, 'r') as f:
-            condition_list = json.load(f)
+        # with open(data_args.gen_conditions_file, 'r') as f:
+        #     condition_list = json.load(f)
 
-        exact_match_acc_by_condition = {}
-        unique_conditions = list(set(condition_list))
-        for cond in unique_conditions:
-            idx = [i for i, x in enumerate(condition_list) if x == cond]
-            exact_match_acc_by_condition[cond] = exact_matches[idx].sum() / len(idx)
+        # condition_list = condition_list[:data_args.max_test_samples]
+
+        # exact_match_acc_by_condition = {}
+        # unique_conditions = list(set(condition_list))
+        # for cond in unique_conditions:
+        #     idx = [i for i, x in enumerate(condition_list) if x == cond]
+        #     exact_match_acc_by_condition[cond] = exact_matches[idx].sum() / len(idx)
       
         # overall accuracy
-        exact_match_acc_by_condition["overall"] = exact_matches.sum() / len(exact_matches)
+        # exact_match_acc_by_condition["overall"] = exact_matches.sum() / len(exact_matches)
 
-        logger.info("Exact match accuries by condition: %s", exact_match_acc_by_condition)
+        # logger.info("Exact match accuries by condition: %s", exact_match_acc_by_condition)
 
-        # save results
-        save_filename = 'accuracies_bert2bert_{}_to_{}.json'.format(model_args.encoder_model, model_args.decoder_model)
+        print('exact match overall: ', exact_matches.sum() / len(exact_matches))
 
-        with open(save_filename, 'w') as f:
-            json.dump(exact_match_acc_by_condition, f)
+        # # save results
+        # save_filename = 'accuracies_bert2bert_{}_to_{}.json'.format(model_args.encoder_model, model_args.decoder_model)
+
+        # with open(save_filename, 'w') as f:
+        #     json.dump(exact_match_acc_by_condition, f)
 
         # generate predictions 
         if trainer.is_world_process_zero():
